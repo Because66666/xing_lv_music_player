@@ -1,10 +1,10 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+<img alt="GHBanner" src="https://github.com/user-attachments/assets/e9e0e6a5-e261-4832-b96e-cf50a5af0ca3" />
 </div>
 
-# Xing lv music player
+# 星旅音乐播放器
 
-星旅音乐播放器：一款现代星际主题的唱片音乐播放器，带有音频可视化功能，专为内容创作者录制音乐而设计。由 Gemini3 初版设计，Trae 持续迭代维护。
+一款现代星际主题的唱片音乐播放器，带有音频可视化功能，专为内容创作者录制音乐而设计。由 Gemini3 初版设计，Trae 持续迭代维护。
 
 **主要特性**
 - 本地运行，无需互联网连接
