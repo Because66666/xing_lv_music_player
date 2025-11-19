@@ -5,7 +5,7 @@ import { Theme } from '../types';
 interface ControlsProps {
   isPlaying: boolean;
   onPlayPause: () => void;
-  onUploadMusic: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onUploadFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onUploadCover: (e: React.ChangeEvent<HTMLInputElement>) => void;
   duration: number;
   currentTime: number;
@@ -25,7 +25,7 @@ const formatTime = (time: number) => {
 export const Controls: React.FC<ControlsProps> = ({
   isPlaying,
   onPlayPause,
-  onUploadMusic,
+  onUploadFile,
   onUploadCover,
   duration,
   currentTime,
@@ -82,13 +82,13 @@ export const Controls: React.FC<ControlsProps> = ({
         
         {/* Left Group: Actions (Absolute to isolate width) */}
         <div className="absolute left-0 flex items-center gap-3">
-           {/* Upload Music */}
+           {/* Upload Music or Playlist */}
            <div className="relative group">
             <input 
               type="file" 
-              accept="audio/*" 
+              accept="audio/*,application/json,.json" 
               onChange={(e) => {
-                onUploadMusic(e);
+                onUploadFile(e);
                 e.target.value = ''; // Reset input
               }}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
@@ -97,7 +97,7 @@ export const Controls: React.FC<ControlsProps> = ({
               <Upload size={18} />
             </button>
             <span className="absolute -top-10 left-0 text-[10px] text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap bg-zinc-900/90 px-3 py-1.5 rounded border border-zinc-800 pointer-events-none backdrop-blur-md">
-              上传音乐
+              上传音乐/歌单
             </span>
           </div>
 
@@ -107,7 +107,7 @@ export const Controls: React.FC<ControlsProps> = ({
               type="file" 
               accept="image/*" 
               onChange={(e) => {
-                onUploadCover(e);
+              onUploadCover(e);
                 e.target.value = ''; // Reset input
               }}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"

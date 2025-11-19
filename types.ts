@@ -19,3 +19,9 @@ export interface Theme {
   gradient: string;  // Tailwind class for backgrounds
   shadow: string;    // CSS shadow string
 }
+
+export interface PlaylistEntry {
+  title: string;
+  path: string;
+  cover?: string;
+}

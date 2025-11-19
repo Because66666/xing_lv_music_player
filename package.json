@@ -3,8 +3,16 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "electron/main.js",
+  "description": "星旅音乐播放器：一款现代星际主题的唱片音乐播放器，带有音频可视化功能，专为内容创作者录制音乐而设计。",
+  "author": "Because66666 ",
   "scripts": {
-    "dev": "vite",
+    "dev:vite": "vite",
+    "dev:electron": "powershell -NoProfile -Command \"$env:NODE_ENV='development'; Start-Process -NoNewWindow -FilePath 'cmd.exe' -ArgumentList '/c','npm run dev:vite'; npx wait-on http://localhost:3000; npx electron .\"",
+    "dev": "npm run dev:electron",
+    "start:electron": "powershell -NoProfile -Command \"$env:ELECTRON_IS_DEV=0; $env:NODE_ENV='production'; npm run build; npx electron .\"",
+    "prebuild:win": "node scripts/gen-ico.js",
+    "build:win": "powershell -NoProfile -Command \"$ErrorActionPreference='SilentlyContinue'; foreach($n in @('electron','Xing lv music player','Xing lv music player Setup')) { Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force }; Start-Sleep -Seconds 1; Remove-Item -Recurse -Force 'release\\win-unpacked' -ErrorAction SilentlyContinue; npm run prebuild:win; npm run build; electron-builder --win --x64\"",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -17,9 +25,42 @@
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.22",
+    "concurrently": "^9.0.1",
+    "electron": "^33.2.0",
+    "electron-builder": "^24.13.3",
+    "png-to-ico": "^2.1.8",
     "postcss": "^8.5.6",
+    "rcedit": "^5.0.1",
     "tailwindcss": "^3.4.18",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.xinglv.player",
+    "productName": "Xing lv music player",
+    "directories": {
+      "output": "release_build",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "signAndEditExecutable": false,
+      "icon": "build\\icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

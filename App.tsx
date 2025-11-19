@@ -3,7 +3,7 @@ const bgImage = new URL('./assets/background.png', import.meta.url).href;
 import { VinylDisc } from './components/VinylDisc';
 import { Controls } from './components/Controls';
 import { Visualizer } from './components/Visualizer';
-import { Track, AudioContextState, Theme } from './types';
+import { Track, AudioContextState, Theme, PlaylistEntry } from './types';
 
 // Predefined "Cool" Neon Themes
 const THEMES: Theme[] = [
@@ -61,6 +61,9 @@ const App: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [hideUI, setHideUI] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<Theme>(THEMES[0]);
+  const [playlist, setPlaylist] = useState<PlaylistEntry[]>([]);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [autoPlayPending, setAutoPlayPending] = useState<boolean>(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioContextRef = useRef<AudioContextState>({
@@ -69,6 +72,19 @@ const App: React.FC = () => {
     source: null
   });
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
+  const lastBlobUrlRef = useRef<string | null>(null);
+
+
+  /**
+   * 检测是否处于 Electron 应用环境
+   */
+  const isElectronEnv = () => {
+    try {
+      return typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('electron');
+    } catch {
+      return false;
+    }
+  };
 
   // Randomize theme on load
   useEffect(() => {
@@ -106,23 +122,41 @@ const App: React.FC = () => {
 
   const handlePlayPause = () => {
     if (!audioRef.current) return;
-
     if (isPlaying) {
       audioRef.current.pause();
-    } else {
-      if (!track.audioUrl) {
-        alert("请点击左下角按钮上传音乐文件 (Please upload music)");
+      setIsPlaying(false);
+      return;
+    }
+    if (!track.audioUrl) {
+      if (playlist.length > 0) {
+        const first = playlist[0];
+        const fileUrl = toFileUrl(first.path);
+        const coverUrl = first.cover ? toFileUrl(first.cover) : track.coverUrl;
+        setCurrentIndex(0);
+        setTrack(prev => ({
+          ...prev,
+          audioUrl: fileUrl,
+          coverUrl: coverUrl ?? null,
+          title: first.title || prev.title,
+          artist: ''
+        }));
+        setAutoPlayPending(true);
+        setIsPlaying(true);
+        return;
+      } else {
+        alert("请点击左下角按钮上传音乐或导入歌单");
         return;
       }
-      initAudioContext();
-      
-      if (audioContextRef.current.audioContext?.state === 'suspended') {
-        audioContextRef.current.audioContext.resume();
-      }
-      
-      audioRef.current.play();
     }
-    setIsPlaying(!isPlaying);
+    initAudioContext();
+    if (audioContextRef.current.audioContext?.state === 'suspended') {
+      audioContextRef.current.audioContext.resume();
+    }
+    const p = audioRef.current.play();
+    if (p && typeof (p as any).catch === 'function') {
+      (p as any).catch(() => {});
+    }
+    setIsPlaying(true);
   };
 
   const handleTimeUpdate = () => {
@@ -134,10 +168,39 @@ const App: React.FC = () => {
   const handleLoadedMetadata = () => {
     if (audioRef.current) {
       setDuration(audioRef.current.duration);
+      if (autoPlayPending) {
+        initAudioContext();
+        if (audioContextRef.current.audioContext?.state === 'suspended') {
+          audioContextRef.current.audioContext.resume();
+        }
+        const playPromise = audioRef.current.play();
+        if (playPromise && typeof (playPromise as any).catch === 'function') {
+          (playPromise as any).catch(() => {});
+        }
+        setIsPlaying(true);
+        setAutoPlayPending(false);
+      }
     }
   };
 
   const handleEnded = () => {
+    if (playlist.length > 0) {
+      const nextIndex = (currentIndex + 1) % playlist.length;
+      const next = playlist[nextIndex];
+      setCurrentIndex(nextIndex);
+      const nextTrack: Track = {
+        audioUrl: toFileUrl(next.path),
+        coverUrl: next.cover ? toFileUrl(next.cover) : null,
+        title: next.title || 'UNTITLED',
+        artist: ''
+      };
+      setTrack(nextTrack);
+      setCurrentTime(0);
+      setAutoPlayPending(true);
+      setIsPlaying(true);
+      randomizeTheme();
+      return;
+    }
     setIsPlaying(false);
     setCurrentTime(0);
   };
@@ -165,11 +228,18 @@ const App: React.FC = () => {
       setCurrentTime(time);
     }
   };
-
+    
+  /**
+   * 处理单曲文件上传
+   */
   const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
+      if (lastBlobUrlRef.current) {
+        URL.revokeObjectURL(lastBlobUrlRef.current);
+      }
+      lastBlobUrlRef.current = url;
       
       // Parse Filename
       const fileName = file.name;
@@ -191,13 +261,76 @@ const App: React.FC = () => {
         title: title || rawName, 
         artist: artist 
       }));
-      
-      setIsPlaying(false);
-      // Change theme on new song for fun
+      setAutoPlayPending(true);
+      setIsPlaying(true);
       randomizeTheme();
     }
   };
 
+  /**
+   * 处理歌单 JSON 上传
+   */
+  const handlePlaylistUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!isElectronEnv()) {
+        alert('歌单模式需要在应用程序下使用');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const json = JSON.parse(ev.target?.result as string) as PlaylistEntry[];
+          if (!Array.isArray(json)) {
+            alert('歌单文件格式错误，应为数组');
+            return;
+          }
+          setPlaylist(json);
+          if (json.length > 0) {
+            const first = json[0];
+            const nextTrack: Track = {
+              audioUrl: toFileUrl(first.path),
+              coverUrl: first.cover ? toFileUrl(first.cover) : null,
+              title: first.title || 'UNTITLED',
+              artist: ''
+            };
+            setCurrentIndex(0);
+            setTrack(nextTrack);
+            setAutoPlayPending(true);
+            setIsPlaying(true);
+            randomizeTheme();
+          }
+        } catch (err) {
+          alert('无法解析歌单 JSON 文件');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  /**
+   * 合并的上传入口：根据后缀分发到音乐或歌单
+   */
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    const isJson = name.endsWith('.json') || file.type === 'application/json';
+    if (isJson) {
+      if (!isElectronEnv()) {
+        alert('歌单模式需要在应用程序下使用');
+        return;
+      }
+      handlePlaylistUpload(e);
+    } else {
+      // 复用音乐上传逻辑
+      handleMusicUpload(e);
+    }
+  };
+
+  /**
+   * 处理封面图片上传
+   */
   const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -208,6 +341,10 @@ const App: React.FC = () => {
 
   return (
     <div className="relative w-full h-full flex flex-col items-center bg-black overflow-hidden font-sans selection:bg-white/20">
+      <div 
+        className="absolute top-0 left-0 w-full" 
+        style={{ height: 36, WebkitAppRegion: 'drag', zIndex: 100 }}
+      ></div>
       
       <div 
         className="absolute inset-0 z-0 pointer-events-none"
@@ -300,7 +437,7 @@ const App: React.FC = () => {
       <Controls 
         isPlaying={isPlaying}
         onPlayPause={handlePlayPause}
-        onUploadMusic={handleMusicUpload}
+        onUploadFile={handleFileUpload}
         onUploadCover={handleCoverUpload}
         duration={duration}
         currentTime={currentTime}
@@ -314,3 +451,12 @@ const App: React.FC = () => {
 };
 
 export default App;
+  const toFileUrl = (p: string) => {
+    if (!p) return '';
+    if (p.startsWith('file://')) return p;
+    const normalized = p.replace(/\\/g, '/').replace(/%/g, '%25');
+    if (/^[A-Za-z]:\//.test(normalized)) {
+      return `file:///${encodeURI(normalized)}`;
+    }
+    return encodeURI(normalized);
+  };
