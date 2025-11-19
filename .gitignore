@@ -25,3 +25,7 @@ dist-ssr
 
 # 歌单
 歌单文件/
+
+# 构建文件
+release_build/
+release/
