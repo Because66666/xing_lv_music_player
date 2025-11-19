@@ -1,0 +1,15 @@
+/* Tailwind 基础指令 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 自定义样式用于唱片效果 */
+.bg-vinyl-black { background-color: #0a0a0a; }
+
+.bg-vinyl-gradient {
+  background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 60%),
+                    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.02) 10%, rgba(255,255,255,0) 65%);
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.animate-spin-slow { animation: spin 20s linear infinite; }
